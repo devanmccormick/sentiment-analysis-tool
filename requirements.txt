@@ -1,4 +1,5 @@
 streamlit>=1.28.0
+python-ipware>=3.0.0
 watchdog>=3.0.0
 python-dotenv>=1.0.0
 pandas>=2.0.0
@@ -6,4 +7,3 @@ numpy<2
 transformers>=4.35.0
 torch>=2.0.0
 vaderSentiment>=3.3.2
-ipinfo>=1.0.0
