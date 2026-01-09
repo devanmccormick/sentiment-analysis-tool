@@ -46,7 +46,7 @@ def _render_admin():
     if not visitors:
         st.info("No visitor entries yet.")
     else:
-        st.dataframe(pd.DataFrame(visitors), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(visitors), width="stretch", hide_index=True)
         import io
         buf = io.BytesIO()
         pd.DataFrame(visitors).to_csv(buf, index=False)
