@@ -1,13 +1,15 @@
 """
 Admin utilities: visitor logging (IP, city, timestamp), save uploads, list data for admin panel.
 Uses /tmp for storage so it works on Streamlit Cloud (data may not persist across restarts).
+Uses ip_check module for client IP and location.
 """
 
 import os
 import csv
 import time
 from pathlib import Path
-from typing import Optional
+
+from ip_check import get_client_ip, get_location
 
 # Storage under /tmp for deployed apps (Streamlit Cloud)
 BASE_DIR = Path(os.environ.get("ADMIN_DATA_DIR", "/tmp"))
@@ -19,54 +21,14 @@ def _ensure_dirs():
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def get_client_ip() -> Optional[str]:
-    """Get client IP from Streamlit context or request headers."""
-    try:
-        import streamlit as _st
-        if hasattr(_st, "context") and hasattr(_st.context, "ip_address"):
-            return getattr(_st.context, "ip_address", None)
-    except Exception:
-        pass
-    try:
-        import streamlit as _st
-        if hasattr(_st, "request") and _st.request and hasattr(_st.request, "headers"):
-            headers = _st.request.headers
-            for key in ("x-forwarded-for", "x-real-ip", "x-client-ip"):
-                if key in headers:
-                    val = headers[key]
-                    if isinstance(val, str) and val.strip():
-                        return val.strip().split(",")[0].strip()
-    except Exception:
-        pass
-    return None
-
-
-def get_ip_location(ip: Optional[str]) -> str:
-    """Get city/location string for IP using ipinfo.io (no token needed for basic)."""
-    if not ip or ip in ("127.0.0.1", "localhost", "::1"):
-        return "Local"
-    try:
-        import urllib.request
-        url = f"https://ipinfo.io/{ip}/json"
-        req = urllib.request.Request(url, headers={"User-Agent": "StreamlitApp/1.0"})
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            import json
-            data = json.loads(resp.read().decode())
-            city = data.get("city") or ""
-            region = data.get("region") or ""
-            country = data.get("country") or ""
-            parts = [p for p in (city, region, country) if p]
-            return ", ".join(parts) if parts else data.get("loc", "Unknown")
-    except Exception:
-        return "Unknown"
-
-
 def log_visitor():
     """Append current visitor IP, location, and timestamp to log. Call once per session."""
     ip = get_client_ip()
-    if ip is None:
-        ip = "unknown"
-    city = get_ip_location(ip)
+    if ip is None or not str(ip).strip() or str(ip).lower() in ("undefined", "none"):
+        ip = "—"
+    city = get_location(ip)
+    if not city or str(city).lower() in ("undefined", "none"):
+        city = "—"
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
     _ensure_dirs()
     file_exists = VISITOR_LOG.exists()
@@ -88,14 +50,24 @@ def save_upload(uploaded_file, original_name: str) -> str:
 
 
 def get_visitor_log() -> list:
-    """Return list of dicts: timestamp, ip, city."""
+    """Return list of dicts: timestamp, ip, city. Normalizes missing/undefined to —."""
     if not VISITOR_LOG.exists():
         return []
     rows = []
+    place = "—"
     with open(VISITOR_LOG, "r", encoding="utf-8", newline="") as f:
         r = csv.DictReader(f)
         for row in r:
-            rows.append(row)
+            normalized = {
+                "timestamp": (row.get("timestamp") or "").strip() or place,
+                "ip": (row.get("ip") or "").strip() or place,
+                "city": (row.get("city") or "").strip() or place,
+            }
+            if normalized["ip"].lower() in ("undefined", "unknown", "none"):
+                normalized["ip"] = place
+            if normalized["city"].lower() in ("undefined", "unknown", "none"):
+                normalized["city"] = place
+            rows.append(normalized)
     return rows
 
 
