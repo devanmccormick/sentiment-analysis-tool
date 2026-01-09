@@ -1,5 +1,6 @@
 jd.md
 plan.md
+example_reviews_with_sentiment.csv
 __pycache__
 *.pyc
 .venv
