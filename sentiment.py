@@ -18,6 +18,9 @@ def _get_pipeline():
     if _use_vader is True:
         return None
     try:
+        import numpy as np
+        if getattr(np, "__version__", "").startswith("2."):
+            raise RuntimeError("NumPy 2.x is incompatible with this torch build; use VADER.")
         from transformers import pipeline
         _pipeline = pipeline(
             "sentiment-analysis",
@@ -26,7 +29,7 @@ def _get_pipeline():
         )
         _use_vader = False
         return _pipeline
-    except Exception:
+    except BaseException:
         _use_vader = True
         return None
 
